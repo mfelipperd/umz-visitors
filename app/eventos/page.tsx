@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, CalendarDays, Clock, MapPin, ChevronRight } from "lucide-react";
 import Footer from "@/components/Footer";
 import SiteLogo from "@/components/SiteLogo";
+import PushSubscribe from "@/components/PushSubscribe";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { splitEvents, formatDayMonth, formatTime, type ChurchEvent } from "@/lib/events";
 
@@ -36,6 +37,8 @@ export default function EventosPage() {
               Fique por dentro do que vai acontecer no Espaço Novo Tempo Umarizal. Todos são bem-vindos.
             </p>
           </header>
+
+          <PushSubscribe />
 
           <section className="space-y-4">
             <h2 className="text-sm font-bold uppercase tracking-[0.25em] text-primary/50">Próximos eventos</h2>
