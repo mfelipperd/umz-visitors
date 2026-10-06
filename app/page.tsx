@@ -43,6 +43,14 @@ function HomeContent() {
         >
           Quero Visitar a Igreja
         </Link>
+        <div>
+          <Link
+            href="/eventos"
+            className="inline-flex items-center justify-center px-8 py-4 bg-accent text-primary font-bold rounded-2xl hover:bg-accent/90 transition-all hover:scale-105 active:scale-95 shadow-xl shadow-accent/20"
+          >
+            Ver Próximos Eventos
+          </Link>
+        </div>
       </div>
 
       <div className="pt-12 flex items-center justify-center gap-8 opacity-40">
