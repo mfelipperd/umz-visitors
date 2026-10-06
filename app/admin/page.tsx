@@ -4,10 +4,6 @@ import { useState, useEffect } from "react";
 import { 
   BarChart3, Users, Globe, Plus, Trash, Edit2, X, ShieldCheck, Menu 
 } from "lucide-react";
-import { 
-  collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc 
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { LanguageProvider, useLanguage } from "@/context/LanguageContext";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -17,7 +13,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-function AdminContent() {
+function AdminContent({ token, onLogout }: { token: string; onLogout: () => void }) {
   const { lang, setLang, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<"analytics" | "members">("analytics");
   const [members, setMembers] = useState<any[]>([]);
@@ -25,21 +21,22 @@ function AdminContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<any>(null);
 
-  // Firestore Listeners
+  const authHeaders = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+  const load = async () => {
+    const res = await fetch("/api/admin/data", { headers: authHeaders, cache: "no-store" });
+    if (res.status === 401) return onLogout();
+    if (!res.ok) return;
+    const d = await res.json();
+    setVisits(d.visits);
+    setMembers(d.members);
+  };
+
   useEffect(() => {
-    const qVisits = query(collection(db, "visits"), orderBy("created_at", "desc"));
-    const unsubVisits = onSnapshot(qVisits, (snapshot) => {
-      setVisits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    const unsubMembers = onSnapshot(collection(db, "members"), (snapshot) => {
-      setMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    return () => {
-      unsubVisits();
-      unsubMembers();
-    };
+    load();
+    const timer = setInterval(load, 30000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Analytics Helpers
@@ -59,11 +56,13 @@ function AdminContent() {
     };
 
     try {
-      if (editingMember) {
-        await updateDoc(doc(db, "members", editingMember.id), data);
-      } else {
-        await addDoc(collection(db, "members"), data);
-      }
+      const res = await fetch(editingMember ? `/api/admin/members/${editingMember.id}` : "/api/admin/members", {
+        method: editingMember ? "PUT" : "POST",
+        headers: authHeaders,
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      await load();
       setIsModalOpen(false);
       setEditingMember(null);
     } catch (err) {
@@ -73,7 +72,8 @@ function AdminContent() {
 
   const handleDeleteMember = async (id: string) => {
     if (confirm("Delete this member?")) {
-      await deleteDoc(doc(db, "members", id));
+      await fetch(`/api/admin/members/${id}`, { method: "DELETE", headers: authHeaders });
+      await load();
     }
   };
 
@@ -165,7 +165,7 @@ function AdminContent() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-medium text-gray-400">
-                        {v.created_at?.toDate().toLocaleString()}
+                        {v.created_at ? new Date(v.created_at).toLocaleString() : ""}
                       </p>
                     </div>
                   </div>
@@ -291,10 +291,52 @@ function AdminContent() {
   );
 }
 
+function AdminGate() {
+  const [token, setToken] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  const [error, setError] = useState("");
+  const [checking, setChecking] = useState(true);
+
+  const tryToken = async (value: string) => {
+    const res = await fetch("/api/admin/data", { headers: { Authorization: `Bearer ${value}` }, cache: "no-store" });
+    if (res.ok) {
+      sessionStorage.setItem("admin_token", value);
+      setToken(value);
+      setError("");
+    } else {
+      sessionStorage.removeItem("admin_token");
+      setToken(null);
+      setError(res.status === 401 ? "Senha incorreta." : "Serviço indisponível. Tente novamente.");
+    }
+  };
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("admin_token");
+    (saved ? tryToken(saved) : Promise.resolve()).finally(() => setChecking(false));
+  }, []);
+
+  if (checking) return null;
+  if (token) return <AdminContent token={token} onLogout={() => { sessionStorage.removeItem("admin_token"); setToken(null); }} />;
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
+      <form
+        onSubmit={(e) => { e.preventDefault(); tryToken(input); }}
+        className="w-full max-w-sm bg-white rounded-3xl shadow-xl border border-gray-100 p-8 space-y-4"
+      >
+        <div className="flex items-center gap-2 text-primary font-bold text-xl"><ShieldCheck className="w-6 h-6" /> Admin</div>
+        <input type="password" value={input} onChange={(e) => setInput(e.target.value)} className="input-field" placeholder="Senha de administrador" autoFocus />
+        {error && <p className="text-sm text-red-500">{error}</p>}
+        <button type="submit" className="btn-primary w-full">Entrar</button>
+      </form>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   return (
     <LanguageProvider>
-      <AdminContent />
+      <AdminGate />
     </LanguageProvider>
   );
 }

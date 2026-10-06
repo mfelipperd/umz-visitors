@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { collection, addDoc, query, where, onSnapshot, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -43,27 +41,13 @@ export default function HostRegistration() {
     setPhone(value);
   };
 
-  // Fetch active hosts (only name is stored in state for privacy)
+  // Lista pública: a API devolve só id e nome dos anfitriões ativos
   useEffect(() => {
-    const q = query(
-      collection(db, "members"),
-      where("is_active", "==", true)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const activeHosts = snapshot.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name
-      }));
-      
-      // Sort in memory to avoid requiring a composite index
-      activeHosts.sort((a, b) => a.name.localeCompare(b.name));
-      
-      setHosts(activeHosts);
-    });
-
-    return () => unsubscribe();
-  }, []);
+    fetch("/api/hosts")
+      .then((r) => r.json())
+      .then((d) => setHosts(d.hosts ?? []))
+      .catch(() => setHosts([]));
+  }, [success]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -93,16 +77,12 @@ export default function HostRegistration() {
     }
 
     try {
-      await addDoc(collection(db, "members"), {
-        name: fullName,
-        age: age,
-        gender: gender,
-        neighborhood: neighborhood,
-        phone: phone, // Assuming DDI+DDD+Phone format if Brazilian
-        is_active: true, // Default to active
-        created_at: new Date(),
-        lgpd_consent: true,
+      const res = await fetch("/api/hosts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: fullName, age, gender, neighborhood, phone, lgpdConsent }),
       });
+      if (!res.ok) throw new Error(String(res.status));
 
       setSuccess(true);
       setPhone("");

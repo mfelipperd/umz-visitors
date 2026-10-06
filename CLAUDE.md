@@ -27,3 +27,10 @@ Inscrições mortas (404/410) são removidas automaticamente no envio. Nunca env
 ## Configuração única na Vercel
 Variáveis em `.env.example`. Sem `NEXT_PUBLIC_VAPID_PUBLIC_KEY` o botão de avisos não aparece.
 No iPhone, as notificações só funcionam com o site adicionado à Tela de Início.
+
+## Dados (sem Firebase)
+Visitas e membros ficam no Upstash Redis (hashes `visits` e `members`), via rotas em `app/api`:
+- Público: `POST /api/visit` (matching + WhatsApp do anfitrião; telefones não vão ao navegador), `GET/POST /api/hosts` (lista só nomes / cadastro de voluntário).
+- Admin (Bearer `ADMIN_TOKEN`): `GET /api/admin/data`, `POST /api/admin/members`, `PUT/DELETE /api/admin/members/[id]`.
+- `/admin` pede a mesma senha (`ADMIN_TOKEN`), guardada só na sessão do navegador.
+Dados antigos do Firestore não foram migrados; o código antigo está no histórico do git.

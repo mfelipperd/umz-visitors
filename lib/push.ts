@@ -1,30 +1,11 @@
 import webpush from "web-push";
 import { createHash, timingSafeEqual } from "crypto";
+import { redis } from "./redis";
 
 export type PushSub = { endpoint: string; keys: { p256dh: string; auth: string } };
 
 const MAX_SUBSCRIBERS = 20000;
 const HASH_KEY = "push:subs";
-
-function redisConfig() {
-  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
-  if (!url || !token) throw new Error("Redis não configurado (UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN)");
-  return { url, token };
-}
-
-async function redis<T = unknown>(cmd: (string | number)[]): Promise<T> {
-  const { url, token } = redisConfig();
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(cmd),
-    cache: "no-store",
-  });
-  const json = await res.json();
-  if (!res.ok || json.error) throw new Error(`Redis: ${json.error ?? res.status}`);
-  return json.result as T;
-}
 
 const idOf = (endpoint: string) => createHash("sha256").update(endpoint).digest("hex");
 

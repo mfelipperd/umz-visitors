@@ -3,13 +3,10 @@
 import { useState, useEffect } from "react";
 import { MessageSquare, User, MapPin } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-import { getBestMemberMatch } from "@/lib/matching";
 import { GENDERS, BAIRROS_BELEM } from "@/lib/constants";
 import BairroSelect from "@/components/BairroSelect";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { collection, addDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,40 +83,24 @@ export default function VisitorForm({ onStepChange }: { onStepChange?: (step: nu
     const age = parseInt(formData.age);
     const religion = formData.religion;
 
-    const matchedMember = await getBestMemberMatch(age, gender, neighborhood);
-
-    if (!matchedMember) {
-      alert(t("errorMatching"));
-      setLoading(false);
-      return;
-    }
-
-    let message = religion === "Adventist" 
-      ? `Olá, meu nome é ${formData.name}. Vi o site da igreja e gostaria de fazer uma visita para passarmos o sábado juntos.`
-      : `Olá, meu nome é ${formData.name}. Vi o site da igreja e gostaria de fazer uma visita para conhecer vocês.`;
-
     try {
-      await addDoc(collection(db, "visits"), {
-        visitor_name: formData.name,
-        visitor_age: age,
-        visitor_gender: gender,
-        visitor_neighborhood: neighborhood,
-        visitor_religion: religion,
-        is_adventist: religion === "Adventist",
-        member_id: matchedMember.id,
-        created_at: new Date()
+      const res = await fetch("/api/visit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: formData.name, age, gender, neighborhood, religion }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) {
+        alert(t("errorMatching"));
+        setLoading(false);
+        return;
+      }
+      setWhatsappUrl(data.url);
     } catch (e) {
-      console.error("Error logging visit:", e);
+      console.error("Error matching host:", e);
+      alert(t("errorMatching"));
     }
 
-    const encodedMsg = encodeURIComponent(message);
-    let cleanPhone = matchedMember.phone.replace(/\D/g, "");
-    if (cleanPhone.length === 10 || cleanPhone.length === 11) {
-      cleanPhone = `55${cleanPhone}`;
-    }
-
-    setWhatsappUrl(`https://wa.me/${cleanPhone}?text=${encodedMsg}`);
     setLoading(false);
   };
 
